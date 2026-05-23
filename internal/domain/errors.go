@@ -3,10 +3,10 @@ package domain
 import "errors"
 
 var (
-	// ErrNotFound — сущность не найдена в БД.
-	ErrNotFound = errors.New("not found")
+	// ErrNotFound — запись не найдена в БД.
+	ErrNotFound = errors.New("resource not found")
 
-	// ErrConflict — нарушение бизнес-правила (цикл, дубль имени и т.д.).
+	// ErrConflict — нарушение бизнес-правила: дубль имени, цикл в дереве.
 	ErrConflict = errors.New("conflict")
 
 	// ErrInvalidInput — невалидные входные данные.

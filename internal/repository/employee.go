@@ -37,6 +37,7 @@ func toEmpModel(e *domain.Employee) *employeeModel {
 		FullName:     e.FullName,
 		Position:     e.Position,
 		HiredAt:      e.HiredAt,
+		CreatedAt:    e.CreatedAt,
 	}
 }
 
@@ -55,9 +56,11 @@ func toEmpDomain(m *employeeModel) *domain.Employee {
 
 func (r *EmployeeRepo) Create(ctx context.Context, e *domain.Employee) error {
 	m := toEmpModel(e)
+
 	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
-		return err
+		return mapDBError(err)
 	}
+
 	e.ID = m.ID
 	e.CreatedAt = m.CreatedAt
 	return nil
@@ -69,7 +72,7 @@ func (r *EmployeeRepo) ListByDepartment(ctx context.Context, departmentID int) (
 		Where("department_id = ?", departmentID).
 		Order("created_at").
 		Find(&models).Error; err != nil {
-		return nil, err
+		return nil, mapDBError(err)
 	}
 
 	result := make([]*domain.Employee, len(models))

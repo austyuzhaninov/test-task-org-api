@@ -2,7 +2,7 @@ package repository
 
 import (
 	"context"
-	"errors"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -10,19 +10,14 @@ import (
 )
 
 // departmentModel — GORM-модель, изолирована внутри репозитория.
-// domain.Department не знает ни о GORM, ни о тегах json.
 type departmentModel struct {
 	ID        int    `gorm:"primaryKey;autoIncrement"`
 	Name      string `gorm:"not null"`
 	ParentID  *int
-	CreatedAt gormTime `gorm:"autoCreateTime"`
+	CreatedAt time.Time `gorm:"autoCreateTime"`
 }
 
 func (departmentModel) TableName() string { return "departments" }
-
-// gormTime нужен чтобы не тащить time.Time в теги — используем стандартный тип.
-// Оставляем просто time.Time через алиас для читаемости модели.
-type gormTime = interface{}
 
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -37,18 +32,20 @@ func NewDepartmentRepo(db *gorm.DB) *DepartmentRepo {
 // toModel конвертирует доменную сущность в GORM-модель.
 func toDepModel(d *domain.Department) *departmentModel {
 	return &departmentModel{
-		ID:       d.ID,
-		Name:     d.Name,
-		ParentID: d.ParentID,
+		ID:        d.ID,
+		Name:      d.Name,
+		ParentID:  d.ParentID,
+		CreatedAt: d.CreatedAt,
 	}
 }
 
-// toDomain конвертирует GORM-модель в доменную сущность.
+// toDepDomain конвертирует GORM-модель в доменную сущность.
 func toDepDomain(m *departmentModel) *domain.Department {
 	return &domain.Department{
-		ID:       m.ID,
-		Name:     m.Name,
-		ParentID: m.ParentID,
+		ID:        m.ID,
+		Name:      m.Name,
+		ParentID:  m.ParentID,
+		CreatedAt: m.CreatedAt,
 	}
 }
 
@@ -56,22 +53,23 @@ func toDepDomain(m *departmentModel) *domain.Department {
 
 func (r *DepartmentRepo) Create(ctx context.Context, d *domain.Department) error {
 	m := toDepModel(d)
+
 	if err := r.db.WithContext(ctx).Create(m).Error; err != nil {
-		return err
+		return mapDBError(err) // Использование общей функции маппинга
 	}
+
 	d.ID = m.ID
+	d.CreatedAt = m.CreatedAt
 	return nil
 }
 
 func (r *DepartmentRepo) GetByID(ctx context.Context, id int) (*domain.Department, error) {
 	var m departmentModel
 	err := r.db.WithContext(ctx).First(&m, id).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, domain.ErrNotFound
-	}
 	if err != nil {
-		return nil, err
+		return nil, mapDBError(err) // Передаем ошибку (включая ErrRecordNotFound) в маппер
 	}
+
 	return toDepDomain(&m), nil
 }
 
@@ -81,7 +79,7 @@ func (r *DepartmentRepo) GetChildren(ctx context.Context, parentID int) ([]*doma
 		Where("parent_id = ?", parentID).
 		Order("created_at").
 		Find(&models).Error; err != nil {
-		return nil, err
+		return nil, mapDBError(err)
 	}
 
 	result := make([]*domain.Department, len(models))
@@ -92,26 +90,40 @@ func (r *DepartmentRepo) GetChildren(ctx context.Context, parentID int) ([]*doma
 }
 
 func (r *DepartmentRepo) Update(ctx context.Context, d *domain.Department) error {
-	// Updates с map гарантирует что NULL (ParentID = nil) тоже запишется.
 	updates := map[string]any{
 		"name":      d.Name,
-		"parent_id": d.ParentID, // nil → SQL NULL
+		"parent_id": d.ParentID,
 	}
-	return r.db.WithContext(ctx).
+
+	result := r.db.WithContext(ctx).
 		Model(&departmentModel{}).
 		Where("id = ?", d.ID).
-		Updates(updates).Error
+		Updates(updates)
+
+	if result.Error != nil {
+		return mapDBError(result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return domain.ErrNotFound
+	}
+
+	return nil
 }
 
 func (r *DepartmentRepo) Delete(ctx context.Context, id int) error {
-	return r.db.WithContext(ctx).
-		Delete(&departmentModel{}, id).Error
+	result := r.db.WithContext(ctx).Where("id = ?", id).Delete(&departmentModel{})
+	if result.Error != nil {
+		return mapDBError(result.Error)
+	}
+
+	if result.RowsAffected == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
 }
 
-// ExistsInSubtree рекурсивно проверяет, входит ли targetID в поддерево rootID.
-// Используется при PATCH чтобы не допустить цикл в дереве.
 func (r *DepartmentRepo) ExistsInSubtree(ctx context.Context, rootID, targetID int) (bool, error) {
-	// Рекурсивный CTE — один запрос вместо N обходов в Go.
 	query := `
 		WITH RECURSIVE subtree AS (
 			SELECT id FROM departments WHERE id = ?
@@ -123,14 +135,16 @@ func (r *DepartmentRepo) ExistsInSubtree(ctx context.Context, rootID, targetID i
 	`
 	var exists bool
 	if err := r.db.WithContext(ctx).Raw(query, rootID, targetID).Scan(&exists).Error; err != nil {
-		return false, err
+		return false, mapDBError(err)
 	}
 	return exists, nil
 }
 
-// ReassignEmployees переводит всех сотрудников из fromDeptID в toDeptID.
 func (r *DepartmentRepo) ReassignEmployees(ctx context.Context, fromDeptID, toDeptID int) error {
-	return r.db.WithContext(ctx).
+	if err := r.db.WithContext(ctx).
 		Exec("UPDATE employees SET department_id = ? WHERE department_id = ?", toDeptID, fromDeptID).
-		Error
+		Error; err != nil {
+		return mapDBError(err)
+	}
+	return nil
 }
