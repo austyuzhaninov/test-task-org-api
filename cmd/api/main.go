@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"embed"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -13,6 +12,7 @@ import (
 	"time"
 
 	"github.com/austyuzhaninov/test-task-org-api/internal/config"
+	"github.com/austyuzhaninov/test-task-org-api/migrations"
 	"github.com/austyuzhaninov/test-task-org-api/pkg/logger"
 	"github.com/pressly/goose/v3"
 	"gorm.io/driver/postgres"
@@ -21,9 +21,6 @@ import (
 
 	_ "github.com/lib/pq"
 )
-
-//go:embed ../../migrations/*.sql
-var migrations embed.FS
 
 func main() {
 	log := logger.New()
@@ -44,12 +41,12 @@ func main() {
 	}
 
 	// --- Миграции через goose ---
-	goose.SetBaseFS(migrations)
+	goose.SetBaseFS(migrations.FS)
 	if err := goose.SetDialect("postgres"); err != nil {
 		log.Error("goose set dialect", slog.String("err", err.Error()))
 		os.Exit(1)
 	}
-	if err := goose.Up(sqlDB, "migrations"); err != nil {
+	if err := goose.Up(sqlDB, "."); err != nil {
 		log.Error("goose up", slog.String("err", err.Error()))
 		os.Exit(1)
 	}
