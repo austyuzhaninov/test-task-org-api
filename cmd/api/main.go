@@ -11,23 +11,26 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/austyuzhaninov/test-task-org-api/internal/config"
-	"github.com/austyuzhaninov/test-task-org-api/migrations"
-	"github.com/austyuzhaninov/test-task-org-api/pkg/logger"
+	_ "github.com/lib/pq"
 	"github.com/pressly/goose/v3"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 
-	_ "github.com/lib/pq"
+	"github.com/austyuzhaninov/test-task-org-api/internal/config"
+	"github.com/austyuzhaninov/test-task-org-api/internal/handler"
+	"github.com/austyuzhaninov/test-task-org-api/internal/middleware"
+	"github.com/austyuzhaninov/test-task-org-api/internal/repository"
+	"github.com/austyuzhaninov/test-task-org-api/internal/service"
+	"github.com/austyuzhaninov/test-task-org-api/migrations"
+	"github.com/austyuzhaninov/test-task-org-api/pkg/logger"
 )
 
 func main() {
 	log := logger.New()
-
 	cfg := config.Load()
 
-	// --- БД: сначала database/sql для goose ---
+	// ── БД ───────────────────────────────────────────────────────────────────
 	sqlDB, err := sql.Open("postgres", cfg.DB.DSN())
 	if err != nil {
 		log.Error("failed to open db", slog.String("err", err.Error()))
@@ -40,7 +43,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// --- Миграции через goose ---
+	// ── Миграции ─────────────────────────────────────────────────────────────
 	goose.SetBaseFS(migrations.FS)
 	if err := goose.SetDialect("postgres"); err != nil {
 		log.Error("goose set dialect", slog.String("err", err.Error()))
@@ -52,7 +55,7 @@ func main() {
 	}
 	log.Info("migrations applied")
 
-	// --- GORM поверх того же пула ---
+	// ── GORM ─────────────────────────────────────────────────────────────────
 	db, err := gorm.Open(postgres.New(postgres.Config{Conn: sqlDB}), &gorm.Config{
 		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
 	})
@@ -61,24 +64,28 @@ func main() {
 		os.Exit(1)
 	}
 
-	// TODO: wire handlers (следующие коммиты)
-	mux := http.NewServeMux()
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprint(w, `{"status":"ok"}`)
-	})
+	// ── Dependency injection ──────────────────────────────────────────────────
+	deptRepo := repository.NewDepartmentRepo(db)
+	empRepo := repository.NewEmployeeRepo(db)
 
-	_ = db // будет использован в следующих коммитах
+	deptSvc := service.NewDepartmentService(deptRepo, empRepo)
+	empSvc := service.NewEmployeeService(empRepo, deptRepo)
 
+	deptHandler := handler.NewDepartmentHandler(deptSvc)
+	empHandler := handler.NewEmployeeHandler(empSvc)
+
+	logMw := middleware.NewLogger(log)
+	router := handler.NewRouter(deptHandler, empHandler, logMw)
+
+	// ── HTTP сервер ───────────────────────────────────────────────────────────
 	srv := &http.Server{
 		Addr:         ":" + cfg.App.Port,
-		Handler:      mux,
+		Handler:      router,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
@@ -100,7 +107,6 @@ func main() {
 	}
 }
 
-// waitForDB ждёт готовности PostgreSQL (до 30 секунд).
 func waitForDB(db *sql.DB, log *slog.Logger) error {
 	for i := range 10 {
 		if err := db.Ping(); err == nil {
