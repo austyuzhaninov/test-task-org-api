@@ -187,6 +187,17 @@ func (s *departmentService) Delete(ctx context.Context, id int, mode string, rea
 		if _, err := s.deptRepo.GetByID(ctx, *reassignTo); err != nil {
 			return fmt.Errorf("reassign target department: %w", domain.ErrNotFound)
 		}
+
+		// Защита — нельзя удалить отдел у которого есть дочерние
+		children, err := s.deptRepo.GetChildren(ctx, id)
+		if err != nil {
+			return err
+		}
+		if len(children) > 0 {
+			return fmt.Errorf("department has %d child departments, use cascade or move them first: %w",
+				len(children), domain.ErrConflict)
+		}
+
 		return s.deptRepo.DeleteWithReassign(ctx, id, *reassignTo)
 
 	default:
