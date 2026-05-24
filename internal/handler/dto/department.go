@@ -46,6 +46,10 @@ func DepartmentFromDomain(d *domain.Department) DepartmentResponse {
 }
 
 func DepartmentNodeFromDomain(node *domain.DepartmentNode) DepartmentNodeResponse {
+	if node == nil || node.Department == nil {
+		return DepartmentNodeResponse{}
+	}
+
 	resp := DepartmentNodeResponse{
 		DepartmentResponse: DepartmentFromDomain(node.Department),
 	}

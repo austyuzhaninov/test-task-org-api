@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/austyuzhaninov/test-task-org-api/internal/handler"
+	"github.com/austyuzhaninov/test-task-org-api/internal/handler/respond"
 	"github.com/austyuzhaninov/test-task-org-api/internal/middleware"
 	"github.com/austyuzhaninov/test-task-org-api/internal/service"
 	"github.com/austyuzhaninov/test-task-org-api/pkg/logger"
@@ -21,16 +22,18 @@ type Setup struct {
 }
 
 func NewSetup() *Setup {
+	log := logger.New()
+	resp := respond.New(log)
+
 	deptRepo := NewDeptRepoMock()
 	empRepo := NewEmpRepoMock()
 
 	deptSvc := service.NewDepartmentService(deptRepo, empRepo)
 	empSvc := service.NewEmployeeService(empRepo, deptRepo)
 
-	deptHandler := handler.NewDepartmentHandler(deptSvc)
-	empHandler := handler.NewEmployeeHandler(empSvc)
+	deptHandler := handler.NewDepartmentHandler(deptSvc, resp)
+	empHandler := handler.NewEmployeeHandler(empSvc, resp)
 
-	log := logger.New()
 	logMw := middleware.NewLogger(log)
 	router := handler.NewRouter(deptHandler, empHandler, logMw)
 

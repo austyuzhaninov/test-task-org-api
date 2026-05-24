@@ -10,32 +10,32 @@ import (
 )
 
 type EmployeeHandler struct {
-	svc domain.EmployeeService
+	svc  domain.EmployeeService
+	resp *respond.Responder
 }
 
-func NewEmployeeHandler(svc domain.EmployeeService) *EmployeeHandler {
-	return &EmployeeHandler{svc: svc}
+func NewEmployeeHandler(svc domain.EmployeeService, resp *respond.Responder) *EmployeeHandler {
+	return &EmployeeHandler{svc: svc, resp: resp}
 }
 
-// POST /departments/{id}/employees/
 func (h *EmployeeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	deptID, err := pathID(r, "id")
 	if err != nil {
-		respond.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid department id"})
+		h.resp.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid department id"})
 		return
 	}
 
 	var req dto.CreateEmployeeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respond.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
+		h.resp.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
 		return
 	}
 
 	emp, err := h.svc.Create(r.Context(), deptID, req.FullName, req.Position, req.HiredAt)
 	if err != nil {
-		respond.Error(w, err)
+		h.resp.Error(w, err)
 		return
 	}
 
-	respond.JSON(w, http.StatusCreated, dto.EmployeeFromDomain(emp))
+	h.resp.JSON(w, http.StatusCreated, dto.EmployeeFromDomain(emp))
 }

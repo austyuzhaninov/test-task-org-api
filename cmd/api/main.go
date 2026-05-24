@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/austyuzhaninov/test-task-org-api/internal/handler/respond"
 	_ "github.com/lib/pq"
 	"github.com/pressly/goose/v3"
 	"gorm.io/driver/postgres"
@@ -29,6 +30,7 @@ import (
 func main() {
 	log := logger.New()
 	cfg := config.Load()
+	resp := respond.New(log)
 
 	// ── БД ───────────────────────────────────────────────────────────────────
 	sqlDB, err := sql.Open("postgres", cfg.DB.DSN())
@@ -71,8 +73,8 @@ func main() {
 	deptSvc := service.NewDepartmentService(deptRepo, empRepo)
 	empSvc := service.NewEmployeeService(empRepo, deptRepo)
 
-	deptHandler := handler.NewDepartmentHandler(deptSvc)
-	empHandler := handler.NewEmployeeHandler(empSvc)
+	deptHandler := handler.NewDepartmentHandler(deptSvc, resp)
+	empHandler := handler.NewEmployeeHandler(empSvc, resp)
 
 	logMw := middleware.NewLogger(log)
 	router := handler.NewRouter(deptHandler, empHandler, logMw)

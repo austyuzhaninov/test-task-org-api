@@ -11,35 +11,36 @@ import (
 )
 
 type DepartmentHandler struct {
-	svc domain.DepartmentService
+	svc  domain.DepartmentService
+	resp *respond.Responder
 }
 
-func NewDepartmentHandler(svc domain.DepartmentService) *DepartmentHandler {
-	return &DepartmentHandler{svc: svc}
+func NewDepartmentHandler(svc domain.DepartmentService, resp *respond.Responder) *DepartmentHandler {
+	return &DepartmentHandler{svc: svc, resp: resp}
 }
 
 // POST /departments/
 func (h *DepartmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req dto.CreateDepartmentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respond.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
+		h.resp.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
 		return
 	}
 
 	dept, err := h.svc.Create(r.Context(), req.Name, req.ParentID)
 	if err != nil {
-		respond.Error(w, err)
+		h.resp.Error(w, err)
 		return
 	}
 
-	respond.JSON(w, http.StatusCreated, dto.DepartmentFromDomain(dept))
+	h.resp.JSON(w, http.StatusCreated, dto.DepartmentFromDomain(dept))
 }
 
 // GET /departments/{id}
 func (h *DepartmentHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r, "id")
 	if err != nil {
-		respond.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
+		h.resp.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
 		return
 	}
 
@@ -51,47 +52,47 @@ func (h *DepartmentHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 
 	node, err := h.svc.GetByID(r.Context(), id, depth, includeEmployees)
 	if err != nil {
-		respond.Error(w, err)
+		h.resp.Error(w, err)
 		return
 	}
 
-	respond.JSON(w, http.StatusOK, dto.DepartmentNodeFromDomain(node))
+	h.resp.JSON(w, http.StatusOK, dto.DepartmentNodeFromDomain(node))
 }
 
 // PATCH /departments/{id}
 func (h *DepartmentHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r, "id")
 	if err != nil {
-		respond.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
+		h.resp.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
 		return
 	}
 
 	var req dto.UpdateDepartmentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respond.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
+		h.resp.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
 		return
 	}
 
 	dept, err := h.svc.Update(r.Context(), id, req.Name, req.ParentID, req.ClearParent)
 	if err != nil {
-		respond.Error(w, err)
+		h.resp.Error(w, err)
 		return
 	}
 
-	respond.JSON(w, http.StatusOK, dto.DepartmentFromDomain(dept))
+	h.resp.JSON(w, http.StatusOK, dto.DepartmentFromDomain(dept))
 }
 
 // DELETE /departments/{id}
 func (h *DepartmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r, "id")
 	if err != nil {
-		respond.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
+		h.resp.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
 		return
 	}
 
 	mode := r.URL.Query().Get("mode")
 	if mode == "" {
-		respond.JSON(w, http.StatusBadRequest, map[string]string{"error": "mode is required (cascade or reassign)"})
+		h.resp.JSON(w, http.StatusBadRequest, map[string]string{"error": "mode is required (cascade or reassign)"})
 		return
 	}
 
@@ -99,14 +100,14 @@ func (h *DepartmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if raw := r.URL.Query().Get("reassign_to_department_id"); raw != "" {
 		v, err := strconv.Atoi(raw)
 		if err != nil {
-			respond.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid reassign_to_department_id"})
+			h.resp.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid reassign_to_department_id"})
 			return
 		}
 		reassignTo = &v
 	}
 
 	if err := h.svc.Delete(r.Context(), id, mode, reassignTo); err != nil {
-		respond.Error(w, err)
+		h.resp.Error(w, err)
 		return
 	}
 
