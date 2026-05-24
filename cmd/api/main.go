@@ -31,7 +31,7 @@ import (
 // @version         1.0
 // @description     REST API для управления организационной структурой компании
 // @host            localhost:8080
-// @BasePath        /
+// @BasePath  		/api/v1
 func main() {
 	log := logger.New()
 	cfg := config.Load()

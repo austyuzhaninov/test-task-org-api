@@ -23,13 +23,13 @@ func NewRouter(dept *DepartmentHandler, emp *EmployeeHandler, log *middleware.Lo
 	mux.HandleFunc("/swagger/", httpSwagger.WrapHandler)
 
 	// Departments
-	mux.HandleFunc("POST /departments", dept.Create)
-	mux.HandleFunc("GET /departments/{id}", dept.GetByID)
-	mux.HandleFunc("PATCH /departments/{id}", dept.Update)
-	mux.HandleFunc("DELETE /departments/{id}", dept.Delete)
+	mux.HandleFunc("POST /api/v1/departments", dept.Create)
+	mux.HandleFunc("GET /api/v1/departments/{id}", dept.GetByID)
+	mux.HandleFunc("PATCH /api/v1/departments/{id}", dept.Update)
+	mux.HandleFunc("DELETE /api/v1/departments/{id}", dept.Delete)
 
 	// Employees
-	mux.HandleFunc("POST /departments/{id}/employees", emp.Create)
+	mux.HandleFunc("POST /api/v1/departments/{id}/employees", emp.Create)
 
 	return log.Middleware(mux)
 }
