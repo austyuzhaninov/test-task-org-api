@@ -13,10 +13,14 @@ import (
 // Это централизованное место: если завтра изменится ORM или СУБД,
 // мы поменяем логику только здесь.
 func mapDBError(err error) error {
+	if err == nil {
+		return nil
+	}
+	// Известные GORM ошибки
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return domain.ErrNotFound
 	}
-
+	// Известные PostgreSQL ошибки
 	var pqErr *pq.Error
 	if errors.As(err, &pqErr) {
 		switch pqErr.Code {
@@ -26,6 +30,6 @@ func mapDBError(err error) error {
 			return fmt.Errorf("related entity not found: %w", domain.ErrNotFound)
 		}
 	}
-
+	// Всё остальное — пробрасываем как есть, respond.Error вернёт 500
 	return err
 }

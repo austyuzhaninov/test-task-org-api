@@ -31,6 +31,7 @@ func httpError(err error) (int, string) {
 	case errors.Is(err, domain.ErrInvalidInput):
 		return http.StatusUnprocessableEntity, err.Error()
 	default:
+		// Детали внутренней ошибки клиенту не отдаём — только логируем на сервере
 		return http.StatusInternalServerError, "internal server error"
 	}
 }
