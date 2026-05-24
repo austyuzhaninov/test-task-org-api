@@ -2,6 +2,7 @@ package testhelper
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"github.com/austyuzhaninov/test-task-org-api/internal/domain"
@@ -47,6 +48,9 @@ func (m *DeptRepoMock) GetChildren(ctx context.Context, parentID int) ([]*domain
 			result = append(result, d)
 		}
 	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].ID < result[j].ID
+	})
 	return result, nil
 }
 
