@@ -1,11 +1,11 @@
-.PHONY: run build test lint migrate-up migrate-down docker-up docker-down
+.PHONY: run build test lint migrate-up migrate-down docker-up docker-down swag
 
 # ── Локальная разработка ──────────────────────────────────────────────────────
 
-run:
+run: swag
 	go run ./cmd/api/main.go
 
-build:
+build: swag
 	go build -o ./bin/server ./cmd/api/main.go
 
 test:
@@ -14,9 +14,14 @@ test:
 lint:
 	golangci-lint run ./...
 
+# ── Swagger ───────────────────────────────────────────────────────────────────
+
+swag:
+	swag init -g cmd/api/main.go -o docs
+
 # ── Docker ────────────────────────────────────────────────────────────────────
 
-docker-up:
+docker-up: swag
 	docker-compose up --build
 
 docker-down:

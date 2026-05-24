@@ -19,11 +19,22 @@ func NewDepartmentHandler(svc domain.DepartmentService, resp *respond.Responder)
 	return &DepartmentHandler{svc: svc, resp: resp}
 }
 
-// POST /departments/
+// Create godoc
+// @Summary     Создать подразделение
+// @Tags        departments
+// @Accept      json
+// @Produce     json
+// @Param       body body dto.CreateDepartmentRequest true "Данные подразделения"
+// @Success     201 {object} dto.DepartmentResponse
+// @Failure     400 {object} dto.ErrorResponse
+// @Failure     404 {object} dto.ErrorResponse "Родительское подразделение не найдено"
+// @Failure     409 {object} dto.ErrorResponse "Подразделение с таким именем уже существует"
+// @Failure     422 {object} dto.ErrorResponse "Невалидные данные"
+// @Router      /departments [post]
 func (h *DepartmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req dto.CreateDepartmentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.resp.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
+		h.resp.JSON(w, http.StatusBadRequest, dto.ErrorResponse{Error: "invalid json"})
 		return
 	}
 
@@ -36,11 +47,22 @@ func (h *DepartmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	h.resp.JSON(w, http.StatusCreated, dto.DepartmentFromDomain(dept))
 }
 
-// GET /departments/{id}
+// GetByID godoc
+// @Summary     Получить подразделение
+// @Description Возвращает подразделение с сотрудниками и деревом дочерних подразделений
+// @Tags        departments
+// @Produce     json
+// @Param       id                path  int  true  "ID подразделения"
+// @Param       depth             query int  false "Глубина дерева (1-5, по умолчанию 1)"
+// @Param       include_employees query bool false "Включить сотрудников (по умолчанию true)"
+// @Success     200 {object} dto.DepartmentNodeResponse
+// @Failure     400 {object} dto.ErrorResponse
+// @Failure     404 {object} dto.ErrorResponse
+// @Router      /departments/{id} [get]
 func (h *DepartmentHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r, "id")
 	if err != nil {
-		h.resp.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
+		h.resp.JSON(w, http.StatusBadRequest, dto.ErrorResponse{Error: "invalid id"})
 		return
 	}
 
@@ -59,17 +81,30 @@ func (h *DepartmentHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	h.resp.JSON(w, http.StatusOK, dto.DepartmentNodeFromDomain(node))
 }
 
-// PATCH /departments/{id}
+// Update godoc
+// @Summary     Обновить подразделение
+// @Description Переименовать или переместить подразделение в другой родительский отдел
+// @Tags        departments
+// @Accept      json
+// @Produce     json
+// @Param       id   path int                         true "ID подразделения"
+// @Param       body body dto.UpdateDepartmentRequest true "Данные для обновления"
+// @Success     200 {object} dto.DepartmentResponse
+// @Failure     400 {object} dto.ErrorResponse
+// @Failure     404 {object} dto.ErrorResponse
+// @Failure     409 {object} dto.ErrorResponse "Цикл в дереве или дубль имени"
+// @Failure     422 {object} dto.ErrorResponse
+// @Router      /departments/{id} [patch]
 func (h *DepartmentHandler) Update(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r, "id")
 	if err != nil {
-		h.resp.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
+		h.resp.JSON(w, http.StatusBadRequest, dto.ErrorResponse{Error: "invalid id"})
 		return
 	}
 
 	var req dto.UpdateDepartmentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.resp.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json"})
+		h.resp.JSON(w, http.StatusBadRequest, dto.ErrorResponse{Error: "invalid json"})
 		return
 	}
 
@@ -82,17 +117,28 @@ func (h *DepartmentHandler) Update(w http.ResponseWriter, r *http.Request) {
 	h.resp.JSON(w, http.StatusOK, dto.DepartmentFromDomain(dept))
 }
 
-// DELETE /departments/{id}
+// Delete godoc
+// @Summary     Удалить подразделение
+// @Tags        departments
+// @Produce     json
+// @Param       id                        path  int    true  "ID подразделения"
+// @Param       mode                      query string true  "Режим удаления: cascade или reassign"
+// @Param       reassign_to_department_id query int    false "ID отдела для перевода сотрудников (обязателен при mode=reassign)"
+// @Success     204
+// @Failure     400 {object} dto.ErrorResponse
+// @Failure     404 {object} dto.ErrorResponse
+// @Failure     409 {object} dto.ErrorResponse "Есть дочерние отделы при mode=reassign"
+// @Router      /departments/{id} [delete]
 func (h *DepartmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r, "id")
 	if err != nil {
-		h.resp.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
+		h.resp.JSON(w, http.StatusBadRequest, dto.ErrorResponse{Error: "invalid id"})
 		return
 	}
 
 	mode := r.URL.Query().Get("mode")
 	if mode == "" {
-		h.resp.JSON(w, http.StatusBadRequest, map[string]string{"error": "mode is required (cascade or reassign)"})
+		h.resp.JSON(w, http.StatusBadRequest, dto.ErrorResponse{Error: "mode is required (cascade or reassign)"})
 		return
 	}
 
@@ -100,7 +146,7 @@ func (h *DepartmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	if raw := r.URL.Query().Get("reassign_to_department_id"); raw != "" {
 		v, err := strconv.Atoi(raw)
 		if err != nil {
-			h.resp.JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid reassign_to_department_id"})
+			h.resp.JSON(w, http.StatusBadRequest, dto.ErrorResponse{Error: "invalid reassign_to_department_id"})
 			return
 		}
 		reassignTo = &v

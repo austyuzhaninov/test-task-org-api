@@ -1,0 +1,274 @@
+basePath: /
+definitions:
+  dto.CreateDepartmentRequest:
+    properties:
+      name:
+        type: string
+      parent_id:
+        type: integer
+    type: object
+  dto.CreateEmployeeRequest:
+    properties:
+      full_name:
+        type: string
+      hired_at:
+        type: string
+      position:
+        type: string
+    type: object
+  dto.DepartmentNodeResponse:
+    properties:
+      children:
+        items:
+          $ref: '#/definitions/dto.DepartmentNodeResponse'
+        type: array
+      created_at:
+        type: string
+      employees:
+        items:
+          $ref: '#/definitions/dto.EmployeeResponse'
+        type: array
+      id:
+        type: integer
+      name:
+        type: string
+      parent_id:
+        type: integer
+    type: object
+  dto.DepartmentResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      parent_id:
+        type: integer
+    type: object
+  dto.EmployeeResponse:
+    properties:
+      created_at:
+        type: string
+      department_id:
+        type: integer
+      full_name:
+        type: string
+      hired_at:
+        type: string
+      id:
+        type: integer
+      position:
+        type: string
+    type: object
+  dto.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  dto.UpdateDepartmentRequest:
+    properties:
+      clear_parent:
+        type: boolean
+      name:
+        type: string
+      parent_id:
+        type: integer
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: REST API для управления организационной структурой компании
+  title: Organization API
+  version: "1.0"
+paths:
+  /departments:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Данные подразделения
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateDepartmentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.DepartmentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Родительское подразделение не найдено
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Подразделение с таким именем уже существует
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Невалидные данные
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Создать подразделение
+      tags:
+      - departments
+  /departments/{id}:
+    delete:
+      parameters:
+      - description: ID подразделения
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 'Режим удаления: cascade или reassign'
+        in: query
+        name: mode
+        required: true
+        type: string
+      - description: ID отдела для перевода сотрудников (обязателен при mode=reassign)
+        in: query
+        name: reassign_to_department_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Есть дочерние отделы при mode=reassign
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Удалить подразделение
+      tags:
+      - departments
+    get:
+      description: Возвращает подразделение с сотрудниками и деревом дочерних подразделений
+      parameters:
+      - description: ID подразделения
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Глубина дерева (1-5, по умолчанию 1)
+        in: query
+        name: depth
+        type: integer
+      - description: Включить сотрудников (по умолчанию true)
+        in: query
+        name: include_employees
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.DepartmentNodeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Получить подразделение
+      tags:
+      - departments
+    patch:
+      consumes:
+      - application/json
+      description: Переименовать или переместить подразделение в другой родительский
+        отдел
+      parameters:
+      - description: ID подразделения
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Данные для обновления
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateDepartmentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.DepartmentResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "409":
+          description: Цикл в дереве или дубль имени
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Обновить подразделение
+      tags:
+      - departments
+  /departments/{id}/employees:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: ID подразделения
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Данные сотрудника
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateEmployeeRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/dto.EmployeeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "404":
+          description: Подразделение не найдено
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+        "422":
+          description: Невалидные данные
+          schema:
+            $ref: '#/definitions/dto.ErrorResponse'
+      summary: Добавить сотрудника в подразделение
+      tags:
+      - employees
+swagger: "2.0"
