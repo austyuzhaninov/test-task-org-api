@@ -182,17 +182,12 @@ func (s *departmentService) Delete(ctx context.Context, id int, mode string, rea
 
 	case "reassign":
 		if reassignTo == nil {
-			return fmt.Errorf("reassign_to_department_id is required for reassign mode: %w", domain.ErrInvalidInput)
+			return fmt.Errorf("reassign_to_department_id is required: %w", domain.ErrInvalidInput)
 		}
-		// Проверяем что целевой отдел существует
 		if _, err := s.deptRepo.GetByID(ctx, *reassignTo); err != nil {
 			return fmt.Errorf("reassign target department: %w", domain.ErrNotFound)
 		}
-		// Переводим сотрудников, затем удаляем
-		if err := s.deptRepo.ReassignEmployees(ctx, id, *reassignTo); err != nil {
-			return err
-		}
-		return s.deptRepo.Delete(ctx, id)
+		return s.deptRepo.DeleteWithReassign(ctx, id, *reassignTo)
 
 	default:
 		return fmt.Errorf("unknown delete mode %q, use cascade or reassign: %w", mode, domain.ErrInvalidInput)

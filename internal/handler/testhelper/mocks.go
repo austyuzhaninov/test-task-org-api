@@ -73,10 +73,6 @@ func (m *DeptRepoMock) ExistsInSubtree(ctx context.Context, rootID, targetID int
 	return false, nil
 }
 
-func (m *DeptRepoMock) ReassignEmployees(ctx context.Context, fromDeptID, toDeptID int) error {
-	return nil
-}
-
 // ─── Employee Repository Mock ─────────────────────────────────────────────────
 
 type EmpRepoMock struct {
@@ -107,4 +103,13 @@ func (m *EmpRepoMock) ListByDepartment(ctx context.Context, departmentID int) ([
 		}
 	}
 	return result, nil
+}
+
+func (m *DeptRepoMock) DeleteWithReassign(ctx context.Context, id, reassignTo int) error {
+	if _, ok := m.Departments[id]; !ok {
+		return domain.ErrNotFound
+	}
+	// В моке просто удаляем — транзакция не нужна
+	delete(m.Departments, id)
+	return nil
 }

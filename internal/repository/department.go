@@ -123,6 +123,27 @@ func (r *DepartmentRepo) Delete(ctx context.Context, id int) error {
 	return nil
 }
 
+func (r *DepartmentRepo) DeleteWithReassign(ctx context.Context, id, reassignTo int) error {
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec(
+			"UPDATE employees SET department_id = ? WHERE department_id = ?",
+			reassignTo, id,
+		).Error; err != nil {
+			return err
+		}
+
+		result := tx.Where("id = ?", id).Delete(&departmentModel{})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return domain.ErrNotFound
+		}
+
+		return nil
+	})
+}
+
 func (r *DepartmentRepo) ExistsInSubtree(ctx context.Context, rootID, targetID int) (bool, error) {
 	query := `
 		WITH RECURSIVE subtree AS (
@@ -138,13 +159,4 @@ func (r *DepartmentRepo) ExistsInSubtree(ctx context.Context, rootID, targetID i
 		return false, mapDBError(err)
 	}
 	return exists, nil
-}
-
-func (r *DepartmentRepo) ReassignEmployees(ctx context.Context, fromDeptID, toDeptID int) error {
-	if err := r.db.WithContext(ctx).
-		Exec("UPDATE employees SET department_id = ? WHERE department_id = ?", toDeptID, fromDeptID).
-		Error; err != nil {
-		return mapDBError(err)
-	}
-	return nil
 }

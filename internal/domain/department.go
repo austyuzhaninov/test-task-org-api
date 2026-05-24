@@ -26,9 +26,8 @@ type DepartmentRepository interface {
 	// Используется для защиты от циклов при PATCH.
 	ExistsInSubtree(ctx context.Context, rootID, targetID int) (bool, error)
 
-	// ReassignEmployees переводит всех сотрудников из одного отдела в другой.
-	// Нужно для режима reassign при удалении.
-	ReassignEmployees(ctx context.Context, fromDeptID, toDeptID int) error
+	// DeleteWithReassign атомарно переводит сотрудников и удаляет отдел.
+	DeleteWithReassign(ctx context.Context, id, reassignTo int) error
 }
 
 // DepartmentService — интерфейс бизнес-логики, используется хендлером.
